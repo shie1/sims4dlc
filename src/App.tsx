@@ -3,6 +3,43 @@ import { ConfigProvider, Layout, theme } from 'antd'
 import './globals.css'
 import { useEffect, useState } from 'react'
 
+const InstanceTab = ({ instance, active, onClick, onRemove }: {
+    instance: string,
+    active: boolean,
+    onClick: () => void,
+    onRemove: () => void
+}) => {
+    const [hover, setHover] = useState<boolean>(false)
+    return (<div style={{
+        display: 'inline-block',
+        padding: '0 10px',
+        height: '100%',
+        lineHeight: '40px',
+        color: '#ffffff',
+        cursor: 'pointer',
+        userSelect: 'none',
+        borderBottom: '2px solid #1c1c1c',
+        backgroundColor: active ? '#1f1f1f' : 'transparent',
+        borderRadius: '5px 5px 0 0',
+    }} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)} onClick={onClick} key={instance}>
+        <span>
+            {instance}
+        </span>
+        {hover &&
+            <span
+                onClick={onRemove}
+                style={{
+                    marginLeft: 10,
+                    fontSize: 20,
+                    lineHeight: '20px',
+                    cursor: 'pointer',
+                }}>
+                x
+            </span>
+        }
+    </div>)
+}
+
 const App = () => {
     const [simsInstances, setSimsInstances] = useState<string[]>([])
     const [activeInstance, setActiveInstance] = useState<number>(0)
@@ -37,18 +74,9 @@ const App = () => {
                             {/* map sims instances as tabs */}
                             {simsInstances.map((instance, key) => {
                                 const active = key === activeInstance
-                                return <div style={{
-                                    display: 'inline-block',
-                                    padding: '0 10px',
-                                    height: '100%',
-                                    lineHeight: '40px',
-                                    color: '#ffffff',
-                                    cursor: 'pointer',
-                                    userSelect: 'none',
-                                    borderBottom: '2px solid #1c1c1c',
-                                    backgroundColor: active ? '#1f1f1f' : 'transparent',
-                                    borderRadius: '5px 5px 0 0',
-                                }} onClick={() => setActiveInstance(key)} key={instance}>{instance}</div>
+                                return <InstanceTab onRemove={() => {
+                                    setSimsInstances(simsInstances.filter((_, i) => i !== key))
+                                }} instance={instance} active={active} onClick={() => setActiveInstance(key)} />
                             })}
                         </div>
                         <div style={{
