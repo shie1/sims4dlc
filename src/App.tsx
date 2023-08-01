@@ -1,7 +1,8 @@
 import { locateSims4 } from '../modules/sims'
 import { ConfigProvider, Layout, theme } from 'antd'
 import './globals.css'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 
 const InstanceTab = ({ instance, active, onClick, onRemove }: {
     instance: string,
@@ -10,33 +11,40 @@ const InstanceTab = ({ instance, active, onClick, onRemove }: {
     onRemove: () => void
 }) => {
     const [hover, setHover] = useState<boolean>(false)
+    const ref = useRef<HTMLDivElement>(null)
     return (<div style={{
         display: 'inline-block',
         padding: '0 10px',
-        height: '100%',
+        height: 40,
+        overflow: 'hidden',
         lineHeight: '40px',
         color: '#ffffff',
         cursor: 'pointer',
+        borderRight: '2px solid #212121',
         userSelect: 'none',
-        borderBottom: '2px solid #1c1c1c',
         backgroundColor: active ? '#1f1f1f' : 'transparent',
-        borderRadius: '5px 5px 0 0',
-    }} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)} onClick={onClick} key={instance}>
+        borderRadius: '0px 10px 0 0',
+    }} ref={ref} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)} onClick={onClick} key={instance}>
         <span>
             {instance}
         </span>
-        {hover &&
-            <span
-                onClick={onRemove}
-                style={{
-                    marginLeft: 10,
-                    fontSize: 20,
-                    lineHeight: '20px',
-                    cursor: 'pointer',
-                }}>
-                x
-            </span>
-        }
+        <AnimatePresence>
+            {hover &&
+                <motion.span
+                    initial={{ opacity: 0, marginLeft: -8 }}
+                    animate={{ opacity: 1, marginLeft: 10 }}
+                    exit={{ opacity: 0, marginLeft: -8 }}
+                    onClick={onRemove}
+                    style={{
+                        fontSize: 20,
+                        overflow: 'hidden',
+                        lineHeight: '20px',
+                        cursor: 'pointer',
+                    }}>
+                    x
+                </motion.span>
+            }
+        </AnimatePresence>
     </div>)
 }
 
@@ -50,6 +58,14 @@ const App = () => {
             setSimsInstances(res)
         })
     }, [setSimsInstances])
+
+    useEffect(() => {
+        if (simsInstances.length === 0) return
+        console.log(simsInstances, activeInstance)
+        if (activeInstance >= simsInstances.length - 1) {
+            setActiveInstance(simsInstances.length - 1)
+        }
+    }, [simsInstances, activeInstance])
 
     return (<>
         <ConfigProvider theme={{
@@ -67,18 +83,23 @@ const App = () => {
                             height: 40,
                             width: '100vw',
                             display: 'flex',
+                            overflow: 'hidden',
+                            overflowX: 'auto',
                             flexDirection: 'row',
                             justifyContent: 'space-between',
                         }}>
-                        <div>
+                        <motion.div style={{
+                            display: 'flex',
+                            flexDirection: 'row',
+                        }} layout layoutDependency={simsInstances}>
                             {/* map sims instances as tabs */}
                             {simsInstances.map((instance, key) => {
                                 const active = key === activeInstance
-                                return <InstanceTab onRemove={() => {
+                                return <InstanceTab key={key} onRemove={() => {
                                     setSimsInstances(simsInstances.filter((_, i) => i !== key))
                                 }} instance={instance} active={active} onClick={() => setActiveInstance(key)} />
                             })}
-                        </div>
+                        </motion.div>
                         <div style={{
                             display: 'flex',
                             flexDirection: 'row',
