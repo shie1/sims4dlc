@@ -14,6 +14,7 @@ const createWindow = (): void => {
   const mainWindow = new BrowserWindow({
     height: 600,
     width: 800,
+    autoHideMenuBar: true,
     webPreferences: {
       nodeIntegration: true, // This is important to enable require() in the HTML file.
       contextIsolation: false, // This is important to enable require() in the HTML file.
