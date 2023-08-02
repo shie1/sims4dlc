@@ -1,5 +1,8 @@
 import { spawn } from "child_process"
-import { accessSync } from "fs"
+import { accessSync, readFileSync } from "fs"
+import { parse } from "ini"
+
+const DLCs = parse(readFileSync("./dlc.ini", "utf-8"))
 
 export const getPartitions = () => {
     return new Promise<string[]>((resolve) => {
@@ -14,6 +17,15 @@ export const getPartitions = () => {
             }
         })
     })
+}
+
+export const isSims4Folder = (folder: string) => {
+    try {
+        accessSync(`${folder}\\Game\\Bin`)
+        return true
+    } catch (e) {
+        return false
+    }
 }
 
 export const locateSims4 = async () => {
@@ -55,13 +67,45 @@ export const locateSims4 = async () => {
             }
         })
         return results
-    }).flat().map((item: string) => {
+    }).flat().filter(isSims4Folder).filter((item: string) => item);
+    return (sims4Folder.filter(item => item) as string[]).map(item => new Sims4Instance(item))
+}
+
+export class Sims4DLC {
+    public readonly installed: boolean = false
+    constructor(
+        public readonly instance: Sims4Instance,
+        public readonly name: string,
+        public readonly id: string
+    ) {
         try {
-            accessSync(`${item}\\Game\\Bin`)
-            return `${item}`
+            accessSync(`${instance.path}\\${id}`)
+            this.installed = true
         } catch (e) {
-            return undefined
+            this.installed = false
         }
-    }).filter((item: string) => item);
-    return sims4Folder.filter(item => item) as string[]
+    }
+
+    openURL() {
+        spawn("explorer", [`https://www.ea.com/games/the-sims/the-sims-4/store/addons/${this.name.toLowerCase().replace(/ /g, "-")}`])
+    }
+}
+
+export class Sims4Instance {
+    constructor(public readonly path: string) {
+    }
+
+    getFolder() {
+        return this.path
+    }
+
+    getDLCs() {
+        return Object.keys(DLCs).map((item: string) => new Sims4DLC(this, DLCs[item].name, item))
+    }
+
+    launch() {
+        spawn(`${this.path}\\Game\\Bin\\TS4_x64.exe`, [], {
+            detached: true,
+        })
+    }
 }
