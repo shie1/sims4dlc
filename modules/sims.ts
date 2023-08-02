@@ -1,8 +1,11 @@
-import { spawn } from "child_process"
-import { accessSync, readFileSync } from "fs"
+import { spawn, execFile } from "child_process"
+import { accessSync, readFileSync, readdirSync } from "fs"
 import { parse } from "ini"
 import { globSync } from "fast-glob"
 import { join } from "path"
+import { useEffect, useState } from "react"
+import { isEqual } from "lodash"
+import { shell } from "electron"
 
 const DLCs = parse(readFileSync("./dlc.ini", "utf-8"))
 
@@ -19,6 +22,24 @@ export const getPartitions = () => {
             }
         })
     })
+}
+
+export const usePartitions = () => {
+    const [partitions, setPartitions] = useState<string[]>([])
+    useEffect(() => {
+        const get = () => getPartitions().then((data: string[]) => {
+            if (isEqual(data, partitions)) return
+            setPartitions(data)
+        })
+        get()
+        const interval = setInterval(() => {
+            get()
+        }, 5000)
+        return () => {
+            clearInterval(interval)
+        }
+    }, [partitions])
+    return partitions
 }
 
 export const isSims4Folder = (folder: string) => {
@@ -73,15 +94,25 @@ export const locateSims4 = async () => {
     return (sims4Folder.filter(item => item) as string[]).map(item => new Sims4Instance(item))
 }
 
+export class DLCDrive {
+    public readonly contents: Array<string> = []
+    constructor(
+        public readonly path: string
+    ) {
+        this.contents = readdirSync(`${path}:\\`).filter((item: string) => Object.keys(DLCs).indexOf(item) !== -1)
+    }
+}
+
 export class Sims4DLC {
     public readonly installed: boolean = false
+    public readonly available: boolean = false
     constructor(
         public readonly instance: Sims4Instance,
         public readonly name: string,
-        public readonly id: string
+        public readonly id: string,
     ) {
         try {
-            accessSync(`${instance.path}\\${id}`)
+            accessSync(`${this.instance.path}\\${id}`)
             this.installed = true
         } catch (e) {
             this.installed = false
@@ -97,10 +128,37 @@ export class Sims4DLC {
         })
         return true
     }
+
+    existsIn(dlcDrive: DLCDrive) {
+        if (!dlcDrive) throw new Error("No DLC drive specified!")
+        return dlcDrive.contents.indexOf(this.id) !== -1
+    }
+
+    getStatus(dlcDrive: DLCDrive) {
+        if (!dlcDrive) throw new Error("No DLC drive specified!")
+        return !this.existsIn(dlcDrive) ? -1 : (this.installed ? 1 : 0)
+    }
 }
 
 export class Sims4Instance {
-    constructor(public readonly path: string) {
+    private cracked = false
+    constructor(
+        public readonly path: string,
+    ) {
+        (() => {
+            try {
+                accessSync(`${this.path}\\dlc.ini`)
+                this.cracked = true
+            } catch (e) { "" }
+            try {
+                accessSync(`${this.path}\\dlc-toggler.exe`)
+                this.cracked = true
+            } catch (e) { "" }
+        })();
+    }
+
+    isCracked() {
+        return this.cracked
     }
 
     getFolder() {
@@ -112,15 +170,13 @@ export class Sims4Instance {
     }
 
     launch() {
-        spawn(`${this.path}\\Game\\Bin\\TS4_x64.exe`, [], {
-            detached: true,
-        })
+        shell.openExternal(join(this.path, "Game\\Bin\\TS4_x64.exe")).catch(() => { "" })
     }
 }
 
 export const isDLCDrive = (drive: string) => {
     try {
-        accessSync(`${drive}\\EP01\\Worlds\\Areas\\EP01_AlienWorld_01.world`)
+        accessSync(`${drive}:\\EP01\\Worlds\\Areas\\EP01_AlienWorld_01.world`)
     } catch (e) {
         return false
     }
@@ -152,10 +208,11 @@ export const getDownloadsFolder = () => {
 
 export const getDLCISO = async () => {
     const dlFolder = await getDownloadsFolder()
-    const filePath = (await globSync("*.iso", {
+    const filePath = globSync("*DLC*.iso", {
         onlyFiles: true,
         cwd: dlFolder,
-    })).filter((item: string) => item.toLowerCase().search("DLC") !== -1)[0]
+    })[0]
+    if (!filePath) return undefined
     return join(dlFolder, filePath)
 }
 
@@ -192,15 +249,4 @@ export const unmountISO = (path: string) => {
     const process = spawn('powershell')
     process.stdin.write(`$driveEject = New-Object -comObject Shell.Application\n$driveEject.Namespace(17).ParseName("${path}:").InvokeVerb("Eject") `);
     process.stdin.end();
-}
-
-export class DLCDrive {
-    public readonly contents: Array<string> = []
-    constructor(
-        public readonly path: string
-    ) {
-        this.contents = globSync("*").filter((item: string) => Object.keys(DLCs).indexOf(item) !== -1)
-    }
-
-
 }

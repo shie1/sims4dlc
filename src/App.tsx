@@ -1,8 +1,8 @@
-import { Sims4Instance, isDLCDrive, isSims4Folder, locateSims4, getDLCISO, mountISO, getDLCDrive, unmountISO, DLCDrive, Sims4DLC } from '../modules/sims'
-import { ConfigProvider, Layout, theme, message, Button, Alert, Modal } from 'antd'
+import { Sims4Instance, isDLCDrive, isSims4Folder, locateSims4, getDLCISO, mountISO, getDLCDrive, unmountISO, DLCDrive, Sims4DLC, usePartitions } from '../modules/sims'
+import { ConfigProvider, Layout, theme, message, Button, Alert, Modal, Badge } from 'antd'
 import './globals.css'
 import { useEffect, useRef, useState, createContext, useContext } from 'react'
-import { IconDeviceFloppy } from "@tabler/icons-react"
+import { IconDeviceFloppy, IconPlayerPlay } from "@tabler/icons-react"
 import { AnimatePresence, motion } from 'framer-motion'
 import { ipcRenderer } from "electron"
 
@@ -28,7 +28,6 @@ const InstanceTab = ({ instance, active, onClick, onRemove }: {
             cursor: 'pointer',
             minWidth: 'max-content',
             borderRight: '2px solid #212121',
-            userSelect: 'none',
             backgroundColor: active ? '#1f1f1f' : 'transparent',
             borderRadius: '0px 10px 0 0',
         }} ref={ref} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)} onClick={onClick}>
@@ -51,18 +50,27 @@ const InstanceTab = ({ instance, active, onClick, onRemove }: {
 }
 
 const DLC = ({ dlc }: { dlc: Sims4DLC }) => {
+    const { globalSettings } = useContext(GlobalSettingsContext)
+    const [status, setStatus] = useState<number>(0)
+    const [selected, setSelected] = useState<boolean>(false)
+
+    useEffect(() => {
+        setStatus(globalSettings.dlcDrive ? dlc.getStatus(globalSettings.dlcDrive) : 0)
+    }, [status, globalSettings.dlcDrive])
+
     return (<div style={{
         aspectRatio: '16 / 9',
-        userSelect: 'none',
         minHeight: 120,
         padding: 10,
         display: 'flex',
         flexDirection: 'column',
         flex: 1,
+        margin: 5,
+        cursor: 'pointer',
+        borderRadius: 10,
+        border: selected ? '2px solid #ffffff' : '2px solid transparent',
     }} onClick={() => {
-        if (!dlc.openFolder()) {
-            message.error('DLC is not installed!')
-        }
+        setSelected((old) => !old)
     }}>
         <div style={{ flexGrow: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
             <h2 style={{
@@ -79,7 +87,7 @@ const DLC = ({ dlc }: { dlc: Sims4DLC }) => {
             </span>
             <span style={{
             }}>
-                {dlc.installed ? '🟢' : '🔴'}
+                {status === -1 ? '⚫' : status === 1 ? '🟢' : '🔴'}
             </span>
         </div>
     </div>)
@@ -88,7 +96,9 @@ const DLC = ({ dlc }: { dlc: Sims4DLC }) => {
 const InstanceDashboard = ({ instance }: { instance: Sims4Instance }) => {
     if (!instance) return <></>
     const { globalSettings, setGlobalSettings } = useContext(GlobalSettingsContext)
+    const name = instance.path.split("\\")[instance.path.split("\\").length - 1]
     const DLCs = instance.getDLCs()
+    const cracked = instance.isCracked()
     return (<>
         <AnimatePresence>
             {globalSettings.dlcDrive === undefined &&
@@ -125,8 +135,7 @@ const InstanceDashboard = ({ instance }: { instance: Sims4Instance }) => {
                                     display: 'flex',
                                     flexDirection: 'row',
                                     padding: '4px 0',
-                                }}
-                            >
+                                }}>
                                 <span style={{
                                     lineHeight: 24,
                                     display: 'flex',
@@ -156,6 +165,66 @@ const InstanceDashboard = ({ instance }: { instance: Sims4Instance }) => {
                 flex: 1,
                 flexShrink: 1,
             }}>
+            <div style={{
+                padding: '0 15px',
+                marginBottom: 20,
+                width: '100%',
+            }}>
+                <div
+                    style={{
+                        display: 'flex',
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        width: '100%',
+                    }}>
+                    <div>
+                        <Badge.Ribbon color={cracked ? "red" : "orange"} text={cracked ? "Cracked" : "EA Official"}>
+                            <h1 style={{
+                                fontSize: 30,
+                                marginBottom: 0,
+                                paddingRight: 5,
+                                paddingTop: 30,
+                            }}>
+                                {name}
+                            </h1>
+                        </Badge.Ribbon>
+                        <p style={{ margin: 0 }}>{instance.path}</p>
+                    </div>
+                    <div style={{
+                        position: 'relative',
+                        top: 28,
+                        marginLeft: 'auto',
+                    }}>
+                        <Button onClick={() => {
+                            instance.launch()
+                        }} style={{
+                            height: 32
+                        }}>
+                            <div
+                                style={{
+                                    display: 'flex',
+                                    flexDirection: 'row',
+                                }}>
+                                <span style={{
+                                    lineHeight: 24,
+                                    display: 'flex',
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    height: 24,
+                                    marginRight: 5,
+                                }}><IconPlayerPlay size={20} /></span>
+                                <span style={{
+                                    lineHeight: 24,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    height: 24,
+                                }}>Play</span>
+                            </div>
+                        </Button>
+                    </div>
+                </div>
+            </div>
             <div
                 style={{
                     display: 'flex',
@@ -184,6 +253,7 @@ const App = () => {
     })
     const [dlcISO, setDLCISO] = useState<string | undefined>(undefined)
     const [dlcISOModal, setDLCISOModal] = useState<boolean>(false)
+    const partitions = usePartitions()
 
     useEffect(() => {
         getDLCDrive().then((res) => {
@@ -211,6 +281,15 @@ const App = () => {
     }, [globalSettings.dlcDrive, dlcISO])
 
     useEffect(() => {
+        if (!partitions) return
+        if (!globalSettings.dlcDrive) return
+        if (!partitions.includes(globalSettings.dlcDrive.path)) {
+            message.error('DLC drive has been unmounted!')
+            setGlobalSettings({ ...globalSettings, dlcDrive: undefined })
+        }
+    }, [partitions, globalSettings.dlcDrive])
+
+    useEffect(() => {
         locateSims4().then((res) => {
             setSimsInstances(res)
         })
@@ -226,8 +305,10 @@ const App = () => {
 
     useEffect(() => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (window as any).simsInstance = simsInstances[activeInstance]
-    }, [activeInstance, simsInstances])
+        (window as any).simsInstance = simsInstances[activeInstance];
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (window as any).globalSettings = globalSettings;
+    }, [activeInstance, simsInstances, globalSettings])
 
     return (<>
         <GlobalSettingsContext.Provider value={{ globalSettings, setGlobalSettings }}>
@@ -251,7 +332,9 @@ const App = () => {
                             okText="Mount"
                             cancelText="Ignore"
                             onOk={() => {
-                                mountISO(dlcISO).then((disk) => {
+                                mountISO(dlcISO).then(async (disk) => {
+                                    ipcRenderer.send('unmount-on-exit', disk)
+                                    await new Promise((resolve) => setTimeout(resolve, 1000))
                                     if (!isDLCDrive(disk)) {
                                         message.error('The mounted ISO is not a DLC drive!')
                                         unmountISO(disk)
@@ -259,6 +342,7 @@ const App = () => {
                                         return
                                     }
                                     setGlobalSettings({ ...globalSettings, dlcDrive: new DLCDrive(disk) })
+                                    setDLCISOModal(false)
                                 })
                             }}>
                             <p style={{ marginBottom: 0 }}>Found a DLC ISO at <i>"{dlcISO}"</i></p>
@@ -295,7 +379,6 @@ const App = () => {
                                         fontSize: 25,
                                         marginLeft: "auto",
                                         flexBasis: 50,
-                                        userSelect: 'none',
                                     }} onClick={() => {
                                         ipcRenderer.invoke('folder-select', {
                                             title: 'Select Sims 4 Folder',

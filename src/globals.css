@@ -4,3 +4,7 @@ body {
     color: white;
     overflow: hidden;
 }
+
+* {
+    user-select: none;
+}
