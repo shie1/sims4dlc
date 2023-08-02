@@ -1,11 +1,10 @@
-import { Sims4Instance, isDLCDrive, isSims4Folder, locateSims4, getDLCISO, mountISO, getDLCDrive, unmountISO } from '../modules/sims'
+import { Sims4Instance, isDLCDrive, isSims4Folder, locateSims4, getDLCISO, mountISO, getDLCDrive, unmountISO, DLCDrive, Sims4DLC } from '../modules/sims'
 import { ConfigProvider, Layout, theme, message, Button, Alert, Modal } from 'antd'
 import './globals.css'
 import { useEffect, useRef, useState, createContext, useContext } from 'react'
 import { IconDeviceFloppy } from "@tabler/icons-react"
 import { AnimatePresence, motion } from 'framer-motion'
 import { ipcRenderer } from "electron"
-import { DLCDrive, Sims4DLC } from '../modules/sims'
 
 const GlobalSettingsContext = createContext<{ globalSettings: GlobalSettings, setGlobalSettings: (value: GlobalSettings) => void }>({ globalSettings: { dlcDrive: undefined }, setGlobalSettings: () => { "" } })
 
